@@ -88,6 +88,9 @@ class mqtt(transport_base):
         self.client.on_message = self.client_on_message
         self.client.on_disconnect = self.on_disconnect
 
+        # Subscribe to Home Assistant status topic
+        self.client.subscribe("homeassistant/status")
+
         self.mqtt_properties = paho.mqtt.properties.Properties(paho.mqtt.packettypes.PacketTypes.PUBLISH)
         self.mqtt_properties.MessageExpiryInterval = 30  # in seconds
 
@@ -179,6 +182,14 @@ class mqtt(transport_base):
     def client_on_message(self, client, userdata, msg):
         """ The callback for when a PUBLISH message is received from the server. """
         self._log.info("MQTT MSG: " + msg.topic+" "+str(msg.payload.decode("utf-8")))
+
+        if msg.topic == "homeassistant/status" and msg.payload.decode("utf-8") == "online":
+            self._log.info("Home Assistant has come online. Re-publishing discovery topics.")
+            # Find the transport to re-discover
+            # This is a bit of a hack, we should have a better way to get the transport
+            for transport in self.bridges:
+                self.mqtt_discovery(transport)
+            return
 
         #self.protocolSettings.validate_registry_entry
         if msg.topic in self.__write_topics:
